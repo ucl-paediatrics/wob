@@ -1,0 +1,13 @@
+[BASIC]
+good-names=i,j,k,ex,Run,_,X,DType ; Add X and DType to standard good names
+good-names-rgxs=^X_.*$,^y_.*$  ; Allow variable names starting with X_ or y_ for features and labels
+
+[EXTENSIONS]
+extension-pkg-allow-list=wob
+
+[MESSAGES CONTROL]
+disable=logging-fstring-interpolation
+
+[FORMAT]
+max-line-length=120
+
