@@ -16,7 +16,7 @@ echo "Creating conda env 'wob' with python $PYTHON_VERSION"
 conda create -n wob python=$PYTHON_VERSION -y
 echo "Activating environment"
 conda activate wob
-pip install -e $RELATIVE_PATH
+pip install -e "$RELATIVE_PATH"
 echo "Creating ipython kernel for jupyter..."
 python -m ipykernel install --user --name=wob --display-name "Python (wob)"
 echo "Setup complete."
