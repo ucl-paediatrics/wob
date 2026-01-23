@@ -10,11 +10,15 @@ def wald_test(
     """
     Perform Wald test for the significance of coefficients in a logistic regression model. 
 
+    Uses a memory-efficient approach to compute the variance-covariance matrix.
+
     Parameters:
     mdl : LogisticRegression
         Fitted logistic regression model from sklearn.
     X : np.ndarray
         Training data used to fit the model.
+
+    Returns the Wald statistics and p-values for each coefficient, including the intercept.
     """
 
     # Get the coefficients and their standard errors
@@ -28,12 +32,19 @@ def wald_test(
     # Construct the design matrix with intercept
     X_design = np.hstack((np.ones((X.shape[0], 1)), X))
 
-    # Calculate the variance-covariance matrix
-    V = np.diag(pred_probs * (1 - pred_probs)) #pylint: disable=C0103
-    XtVX_inv = np.linalg.inv(X_design.T @ V @ X_design) #pylint: disable=C0103
+    # Calculate the variance-covariance matrix without forming a large diagonal matrix
+    weights = pred_probs * (1 - pred_probs)
+    XtWX = X_design.T @ (X_design * weights[:, None]) #pylint: disable=C0103
+
+    # Prefer direct inverse; if singular/ill-conditioned, fallback to gentle regularization
+    try:
+        cov = np.linalg.inv(XtWX)
+    except np.linalg.LinAlgError:
+        eps = 1e-8 * np.trace(XtWX) / XtWX.shape[0]
+        cov = np.linalg.inv(XtWX + np.eye(XtWX.shape[0]) * eps)
 
     # Standard errors are the square roots of the diagonal elements
-    std_errors = np.sqrt(np.diag(XtVX_inv))
+    std_errors = np.sqrt(np.diag(cov))
 
     # Calculate Wald statistics and p-values
     wald_stats = (params / std_errors) ** 2
