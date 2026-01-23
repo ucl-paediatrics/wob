@@ -2,8 +2,8 @@
 import numpy as np
 import polars as pl
 
-from src import base
-from src.base import pews_scores
+from wob import base
+from wob.base import pews_scores
 
 
 def make_empty_row():

@@ -177,7 +177,7 @@ def pews_scores(data:pl.DataFrame):
 
     return data.select(
         pl.max_horizontal([
-            pl.col(sign)*scores[sign]
+            pl.col(sign).cast(pl.Boolean) * scores[sign]
             for sign in WOB_SIGNS
         ])).to_numpy().ravel()
 
