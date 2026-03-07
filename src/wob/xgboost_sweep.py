@@ -1,5 +1,7 @@
 """Run an XGBoost hyperparameter sweep to predict WOB outcome from signs"""
 import argparse
+from datetime import datetime
+from functools import partial
 import time
 import warnings
 
@@ -32,18 +34,14 @@ train_data = base.add_time_to_event_columns(train_data)
 
 X_train = train_data.select(base.WOB_SIGNS)
 y_train = train_data.select(pl.col('event_within_time_tolerance')).to_numpy().ravel()
-    
-RANDOM_SEED = 42
 
-OUTPUT_BASE_DIRECTORY = "/home/workspace/files/Sairam - WOB/"
-
-def objective(trial, filename: str) -> float:
+def objective(trial, filename: str, random_seed: int) -> float:
     """Objective function for Optuna hyperparameter optimization."""
     train_x, val_x, train_y, val_y = train_test_split(
         X_train,
         y_train,
         test_size = 0.2,
-        random_state = RANDOM_SEED + trial.number
+        random_state = random_seed + trial.number
     )
 
     param = {
@@ -73,21 +71,27 @@ def objective(trial, filename: str) -> float:
     with open(filename, 'a', encoding='utf-8') as f:
         if f.tell() == 0:  # If file is empty, write header
             f.write('trial_number,' + ','.join(param.keys()) + ',auroc\n')
-        f.write(f"{trial.number}," + 
-                ','.join(str(param[key]) for key in param.keys()) + 
+        f.write(f"{trial.number}," +
+                ','.join(str(param[key]) for key in list(param)) +
                 f",{auroc}\n"
         )
 
     return float(auroc)
 
-def main(n_trials: int = 50):
+def main(n_trials, output_dir: str, random_seed: int):
     """Run the Optuna hyperparameter optimization for XGBoost."""
     start_time = time.time()
-    sampler = optuna.samplers.TPESampler(seed=RANDOM_SEED)
+    sampler = optuna.samplers.TPESampler(seed=random_seed)
     study = optuna.create_study(direction='maximize', sampler=sampler)
-    optuna_param_filename = f"xgboost_optuna_params_{n_trials}_trials.csv"
-    optuna_output_path = OUTPUT_BASE_DIRECTORY + optuna_param_filename
-    study.optimize(lambda trial: objective(trial, filename=optuna_output_path), n_trials=n_trials)
+    optuna_param_filename = f"xgboost_optuna_params_{n_trials}_trials_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    optuna_output_path = output_dir + optuna_param_filename
+
+    # Use partial to wrap the objective function with the filename and random seed parameters,
+    # so that Optuna can call it with just the trial parameter.
+    # This is like a lambda, but lambdas shouldn't be assigned to variables.
+    objective_function = partial(objective, filename=optuna_output_path, random_seed=random_seed)
+
+    study.optimize(objective_function, n_trials=n_trials)
     end_time = time.time()
 
     print("\n\n------------------------------\n")
@@ -103,5 +107,21 @@ if __name__ == "__main__":
         "--n_trials", type=int, default=50, 
         help="Number of Optuna trials to run for hyperparameter optimization."
     )
+    parser.add_argument(
+        "--output_dir", type=str, default="/home/workspace/files/Sairam - WOB/",
+        help="Base directory to save the Optuna results CSV file."
+    )
+    parser.add_argument(
+        "--random_seed", type=int, default=42,
+        help=(
+            "Random seed for reproducibility of results, combined with trial "
+            "number to ensure different splits across trials. Default is 42."
+        )
+    )
+
     args = parser.parse_args()
-    main(n_trials=args.n_trials)
+    main(
+        n_trials=args.n_trials,
+        output_dir=args.output_dir,
+        random_seed=args.random_seed
+    )
