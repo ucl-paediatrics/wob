@@ -41,7 +41,7 @@ def objective(trial, filename: str, random_seed: int) -> float:
         X_train,
         y_train,
         test_size = 0.2,
-        random_state = random_seed + trial.number
+        random_state = random_seed * 1_000_000 + trial.number
     )
 
     param = {
